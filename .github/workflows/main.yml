@@ -41,7 +41,7 @@ jobs:
           done
           # 2. 提前创建模块目录并复制文件（确保 Action 执行时目录存在）
           mkdir -p "$MODULE_NAME"
-          cp code/*.h code/*.c code/Makefile "$MODULE_NAME/"
+          cp code/*.c code/Makefile "$MODULE_NAME/"
           echo "✅ 模块目录创建完成：$MODULE_NAME"
           ls -al "$MODULE_NAME/"
 
