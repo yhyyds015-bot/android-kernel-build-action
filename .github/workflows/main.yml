@@ -1,6 +1,6 @@
 name: Build AArch64 GKI Kernel Module (from code/)
 on:
-  workflow_dispatch:  # 手动触发构建
+  workflow_dispatch:
     inputs:
       kernel_tag:
         description: 'Android Kernel Tag (e.g., android13-5.15, android16-6.12)'
@@ -18,7 +18,7 @@ on:
       module_name:
         description: 'Kernel Module Name (must match code/[module_name].c)'
         required: true
-        default: 'mydriver'  # 替换为你的模块名
+        default: 'mydriver'
 
 jobs:
   build-module:
@@ -27,42 +27,37 @@ jobs:
       - name: Checkout repository (含 code 目录)
         uses: actions/checkout@v4.2.2
 
-      - name: 检查 code 目录文件规范
+      - name: 检查并准备模块目录（关键修复）
         shell: bash
         run: |
           MODULE_NAME="${{ github.event.inputs.module_name }}"
-          echo "正在校验 code 目录下文件是否符合要求..."
-          
-          # 校验必需文件存在
-          REQUIRED_FILES=(
-            "code/${MODULE_NAME}.c"  # 模块核心源码
-            "code/Makefile"          # 模块编译脚本
-          )
-          
+          # 1. 校验 code 目录文件
+          REQUIRED_FILES=("code/${MODULE_NAME}.c" "code/Makefile")
           for file in "${REQUIRED_FILES[@]}"; do
             if [ ! -f "$file" ]; then
               echo "❌ 缺失必需文件: $file"
               exit 1
             fi
           done
-          
-          # 校验 Makefile 基础配置（可选，增强兼容性）
-          if ! grep -q "obj-m += ${MODULE_NAME}.o" "code/Makefile"; then
-            echo "⚠️ code/Makefile 未发现 'obj-m += ${MODULE_NAME}.o'，自动添加..."
-            echo -e "\nobj-m += ${MODULE_NAME}.o" >> "code/Makefile"
-          fi
-          
-          echo "✅ 文件规范校验通过！"
+          # 2. 提前创建模块目录并复制文件（确保 Action 执行时目录存在）
+          mkdir -p "$MODULE_NAME"
+          cp code/*.h code/*.c code/Makefile "$MODULE_NAME/"
+          echo "✅ 模块目录创建完成：$MODULE_NAME"
+          ls -al "$MODULE_NAME/"
 
       - name: 调用 GKI 模块构建 Action
-        uses: ./  # 本地 Action（若 Action 已发布到 GitHub，替换为 "你的用户名/仓库名@版本"）
+        uses: ./  # 本地 Action 路径
         with:
           tag: ${{ github.event.inputs.kernel_tag }}
-          arch: aarch64  # 固定为 aarch64，与 Action 要求一致
+          arch: aarch64
           module-name: ${{ github.event.inputs.module_name }}
 
       - name: 查看构建产物
         shell: bash
         run: |
-          echo "构建产物列表："
-          ls -al ./output/
+          if [ -d "./output" ]; then
+            echo "构建产物列表："
+            ls -al ./output/
+          else
+            echo "⚠️ 未找到 output 目录，可能构建失败"
+          fi
